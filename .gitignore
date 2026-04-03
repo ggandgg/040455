@@ -1,0 +1,8 @@
+# Google API 憑證（勿上傳）
+credentials.json
+token.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
