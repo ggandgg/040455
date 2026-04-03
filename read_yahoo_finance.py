@@ -20,8 +20,22 @@ import json
 from datetime import datetime
 
 
+def normalize_symbol(symbol):
+    """將未帶市場後綴的純數字代碼自動加上 .TW（預設台股）。
+    若代碼已含 . 後綴（如 .TW, .TWO, .HK, .T）或為英文字母代碼則不處理。
+    """
+    symbol = symbol.strip().upper()
+    if "." in symbol or "^" in symbol:
+        return symbol
+    # 純數字 → 視為台股，自動加 .TW
+    if symbol.isdigit():
+        return symbol + ".TW"
+    return symbol
+
+
 def get_stock_price(symbol):
     """取得股票即時報價。"""
+    symbol = normalize_symbol(symbol)
     ticker = yf.Ticker(symbol)
     info = ticker.info
 
@@ -48,6 +62,7 @@ def get_stock_price(symbol):
 
 def get_history(symbol, period="1mo"):
     """取得歷史價格數據。"""
+    symbol = normalize_symbol(symbol)
     ticker = yf.Ticker(symbol)
     hist = ticker.history(period=period)
 
@@ -66,6 +81,7 @@ def get_history(symbol, period="1mo"):
 
 def get_company_info(symbol):
     """取得公司基本資訊。"""
+    symbol = normalize_symbol(symbol)
     ticker = yf.Ticker(symbol)
     info = ticker.info
 
@@ -105,6 +121,7 @@ def compare_stocks(symbols):
     print("-" * 68)
 
     for symbol in symbols:
+        symbol = normalize_symbol(symbol)
         ticker = yf.Ticker(symbol)
         info = ticker.info
         if not info or "shortName" not in info:
@@ -170,7 +187,7 @@ def main():
         choice = input("\n請選擇 (1/2/3/4/5/q): ").strip()
 
         if choice == "1":
-            symbol = input("輸入股票代碼 (例如 AAPL, 2330.TW): ").strip()
+            symbol = input("輸入股票代碼 (例如 2330, 2408, AAPL；純數字預設台股): ").strip()
             if symbol:
                 get_stock_price(symbol)
 
@@ -186,7 +203,7 @@ def main():
                 get_company_info(symbol)
 
         elif choice == "4":
-            symbols_str = input("輸入多個股票代碼，用逗號分隔 (例如 AAPL,MSFT,GOOGL): ").strip()
+            symbols_str = input("輸入多個股票代碼，用逗號分隔 (例如 2330,2408,AAPL): ").strip()
             if symbols_str:
                 symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
                 compare_stocks(symbols)
