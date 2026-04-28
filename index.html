@@ -188,11 +188,16 @@
   </div>
 
   <details open>
-    <summary>下載 AHK 腳本（第一次使用先下載這兩支）</summary>
-    <p style="font-size:13px;color:#4b5563;margin:6px 0 12px">
-      把 <b>auto_click.ahk</b>、<b>auto_input.ahk</b> 跟 <b>data.csv</b> 放在同一個資料夾即可使用。
+    <summary>① 下載 AHK 腳本（第一次使用先下載到雲端資料夾）</summary>
+    <p style="font-size:13px;color:#4b5563;margin:6px 0 8px">
+      建議在雲端硬碟建立一個資料夾（例如 <code>vitals/</code>），把兩支 <code>.ahk</code> 放進去；
+      之後每次下載 <code>data.csv</code> 也存到同一個資料夾覆蓋，AHK 會自動讀取。
       電腦需安裝 <a href="https://www.autohotkey.com/" target="_blank" rel="noopener">AutoHotkey v1.1</a>。
     </p>
+    <pre style="background:#f3f4f6;color:#1f2933;padding:10px 14px;font-size:12px;line-height:1.6">vitals/                  ← 你的雲端資料夾（Google Drive / OneDrive / Dropbox 都可）
+├─ auto_click.ahk        ← 從這裡下載 ↓
+├─ auto_input.ahk        ← 從這裡下載 ↓
+└─ data.csv              ← 每次輸入完從表格下載，蓋掉舊的</pre>
     <div class="toolbar" style="margin:0">
       <button id="dlClick">⬇ auto_click.ahk</button>
       <button id="dlInput">⬇ auto_input.ahk</button>
@@ -201,11 +206,12 @@
   </details>
 
   <details open>
-    <summary>使用步驟</summary>
+    <summary>② 使用步驟</summary>
     <ol class="steps">
-      <li>第一次使用：上方按鈕下載兩支 <code>.ahk</code>，放到固定資料夾（例如桌面 <code>vitals</code>）。</li>
-      <li>在表格輸入每位病人的生命徵象，欄位空白會自動忽略。</li>
-      <li>按 <code>⬇ 下載 data.csv</code>，把它存到跟 <code>.ahk</code> 同一個資料夾（同名覆蓋）。</li>
+      <li>第一次使用：用上方按鈕下載兩支 <code>.ahk</code> 到雲端 <code>vitals/</code> 資料夾。</li>
+      <li>每次使用：在表格輸入每位病人的生命徵象（空白列自動忽略）。</li>
+      <li>按 <code>⬇ 下載 data.csv</code>，存到 <code>vitals/</code> 同一個資料夾（同名覆蓋）。
+        <br><span style="font-size:12px;color:#6b7280">小技巧：把瀏覽器下載位置設成 <code>vitals/</code>，就不用每次手動搬。</span></li>
       <li>雙擊 <code>auto_click.ahk</code>，到醫院系統輸入頁：<code>F1</code> 點第 1 列、<code>F2</code> 點最後一列、<code>F3</code> 開始自動點擊定位。</li>
       <li>雙擊 <code>auto_input.ahk</code>，按 <code>F1</code> 開始送資料；<code>F2</code> 暫停、<code>F3</code> 繼續、<code>Esc</code> 停止。</li>
     </ol>
