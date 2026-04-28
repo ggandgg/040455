@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>生命徵象輸入產生器</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #f4f6f9;
+    color: #1f2933;
+  }
+  header {
+    background: #1f2933;
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .hint { font-size: 12px; opacity: 0.7; }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  button {
+    background: #2563eb;
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.secondary { background: #6b7280; }
+  button.danger { background: #dc2626; }
+  button:hover { filter: brightness(1.08); }
+  #count {
+    margin-left: auto;
+    font-size: 14px;
+    color: #4b5563;
+  }
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  thead th {
+    background: #e5e7eb;
+    padding: 10px 8px;
+    font-size: 13px;
+    text-align: center;
+    border-bottom: 1px solid #d1d5db;
+    position: sticky;
+    top: 0;
+  }
+  tbody td {
+    padding: 4px;
+    border-bottom: 1px solid #f1f3f5;
+    text-align: center;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody td input {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 8px 6px;
+    font-size: 15px;
+    text-align: center;
+    background: transparent;
+  }
+  tbody td input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #eff6ff;
+  }
+  tbody td input.warn {
+    background: #fef3c7;
+  }
+  td.idx {
+    width: 36px;
+    color: #9ca3af;
+    font-size: 12px;
+  }
+  td.del { width: 40px; }
+  td.del button {
+    background: transparent;
+    color: #9ca3af;
+    padding: 4px 8px;
+    font-size: 16px;
+  }
+  td.del button:hover { color: #dc2626; }
+  details {
+    margin-top: 24px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  details summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 6px 0;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .copybar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+  .copybar h3 { margin: 0; font-size: 14px; }
+  ol.steps { padding-left: 20px; line-height: 1.7; }
+  ol.steps code {
+    background: #eef2ff;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    background: #1f2933;
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity .2s;
+    pointer-events: none;
+    font-size: 14px;
+  }
+  .toast.show { opacity: 0.95; }
+</style>
+</head>
+<body>
+<header>
+  <h1>生命徵象輸入產生器</h1>
+  <div class="hint">Tab 跳格 / Enter 新增列 / Ctrl+S 下載</div>
+</header>
+<main>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>PM體溫</th>
+        <th>呼吸</th>
+        <th>脈搏</th>
+        <th>收縮壓</th>
+        <th>舒張壓</th>
+        <th>血氧</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <div class="toolbar">
+    <button id="addRow">+ 新增一列</button>
+    <button id="clearAll" class="secondary">全部清空</button>
+    <button id="download">⬇ 下載 data.csv</button>
+    <span id="count">0 筆</span>
+  </div>
+
+  <details open>
+    <summary>使用步驟</summary>
+    <ol class="steps">
+      <li>在上方表格輸入每位病人的生命徵象，欄位空白會自動忽略。</li>
+      <li>按 <code>下載 data.csv</code>，把檔案放到 AHK 腳本同一個資料夾。</li>
+      <li>執行下方兩支 AHK 腳本（或合併版）。</li>
+      <li>到醫院系統的輸入頁，<code>F1</code> 點第 1 列、<code>F2</code> 點最後一列，<code>F3</code> 開始自動點擊定位。</li>
+      <li>切換到資料輸入腳本，按 <code>F1</code> 開始送資料；<code>F2</code> 暫停、<code>F3</code> 繼續、<code>Esc</code> 停止。</li>
+    </ol>
+  </details>
+
+  <details>
+    <summary>📋 改良版 AHK：自動校準 rowHeight（推薦）</summary>
+    <p style="font-size:13px;color:#4b5563">
+      不再寫死 <code>rowHeight := 31</code>。F1 標第 1 列、F2 標最後一列，
+      腳本會自己讀 <code>data.csv</code> 算出筆數，把列高自動算出來，換解析度／螢幕縮放都不用改。
+    </p>
+    <div class="copybar">
+      <h3>auto_click.ahk</h3>
+      <button class="secondary" data-copy="ahk1">複製</button>
+    </div>
+    <pre id="ahk1">; ==== 自動校準版：左側欄位定位點擊 ====
+CoordMode, Mouse, Screen
+SetMouseDelay, 10
+
+startX := ""
+startY := ""
+endY := ""
+running := false
+
+F1::
+MouseGetPos, startX, startY
+ToolTip 第一列 %startX% , %startY%
+Sleep 700
+ToolTip
+return
+
+F2::
+MouseGetPos, , endY
+ToolTip 最後一列 Y=%endY%
+Sleep 700
+ToolTip
+return
+
+F3::
+if (startX = "" || startY = "" || endY = "")
+{
+    MsgBox 請先 F1 標第一列、F2 標最後一列
+    return
+}
+
+; 自動修正上下顛倒
+if (startY > endY)
+{
+    tmp := startY
+    startY := endY
+    endY := tmp
+}
+
+; 從 data.csv 自動讀筆數
+FileRead, csv, data.csv
+if (ErrorLevel)
+{
+    MsgBox 找不到 data.csv（請放在腳本同資料夾）
+    return
+}
+StringReplace, csv, csv, `r,, All
+rows := StrSplit(csv, "`n")
+rowCount := 0
+for i, r in rows
+    if (Trim(r) != "")
+        rowCount++
+
+if (rowCount < 2)
+{
+    ; 只有 1 筆就直接點一次
+    MouseMove, startX, startY, 0
+    MouseClick, left
+    return
+}
+
+rowHeight := (endY - startY) / (rowCount - 1)
+ToolTip rowCount=%rowCount%`nrowHeight=%rowHeight%
+Sleep 800
+ToolTip
+
+running := true
+Loop %rowCount%
+{
+    if (!running)
+        break
+    y := startY + (A_Index - 1) * rowHeight
+    MouseMove, startX, Round(y), 0
+    MouseClick, left
+    Sleep 30
+}
+running := false
+return
+
+Esc::
+running := false
+return
+</pre>
+
+    <div class="copybar">
+      <h3>auto_input.ahk</h3>
+      <button class="secondary" data-copy="ahk2">複製</button>
+    </div>
+    <pre id="ahk2">; ==== 自動輸入 data.csv ====
+SendMode Input
+SetKeyDelay, -1
+SetBatchLines, -1
+SetWinDelay, -1
+
+paused := false
+stop := false
+
+Esc::
+stop := true
+paused := false
+ToolTip 已緊急停止
+Sleep 800
+ToolTip
+return
+
+F2::
+paused := true
+ToolTip 已暫停 (按 F3 繼續)
+return
+
+F3::
+paused := false
+ToolTip 繼續輸入
+Sleep 500
+ToolTip
+return
+
+F1::
+stop := false
+paused := false
+
+FileRead, csv, data.csv
+if (ErrorLevel)
+{
+    MsgBox 找不到 data.csv
+    return
+}
+StringReplace, csv, csv, `r,, All
+rows := StrSplit(csv, "`n")
+
+total := 0
+for i, r in rows
+    if (Trim(r) != "")
+        total++
+
+count := 0
+for index, row in rows
+{
+    if (stop)
+        break
+    while (paused)
+        Sleep 50
+
+    row := Trim(row)
+    if (row = "")
+        continue
+
+    count++
+    if (Mod(count, 20) = 0)
+        ToolTip 輸入中: %count% / %total%
+
+    fields := StrSplit(row, ",")
+    Loop % fields.Length()
+    {
+        if (stop)
+            break
+        while (paused)
+            Sleep 50
+
+        value := fields[A_Index]
+        if (A_Index <= 4)
+            SendInput % value . "{Tab}"
+        else if (A_Index = 5)
+            SendInput % value . "{Tab 2}"
+        else if (A_Index = 6)
+            SendInput % value . "{Tab 6}"
+    }
+}
+
+ToolTip 完成輸入 (%count% 筆)
+Sleep 1500
+ToolTip
+return
+</pre>
+  </details>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const COLS = ['temp', 'resp', 'pulse', 'sbp', 'dbp', 'spo2'];
+  const RANGES = {
+    temp:  [34, 41],
+    resp:  [8, 40],
+    pulse: [40, 180],
+    sbp:   [70, 220],
+    dbp:   [40, 130],
+    spo2:  [70, 100],
+  };
+  const tbody = document.getElementById('rows');
+  const countEl = document.getElementById('count');
+  const toast = document.getElementById('toast');
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove('show'), 1600);
+  }
+
+  function makeRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="idx"></td>
+      ${COLS.map(c => `<td><input data-col="${c}" inputmode="decimal" autocomplete="off"></td>`).join('')}
+      <td class="del"><button title="刪除這列" type="button">×</button></td>
+    `;
+    tr.querySelector('.del button').addEventListener('click', () => {
+      tr.remove();
+      if (tbody.children.length === 0) addRow();
+      renumber();
+    });
+    tr.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', () => validate(inp));
+      inp.addEventListener('keydown', onKey);
+    });
+    return tr;
+  }
+
+  function addRow(focus = true) {
+    const tr = makeRow();
+    tbody.appendChild(tr);
+    renumber();
+    if (focus) tr.querySelector('input').focus();
+    return tr;
+  }
+
+  function renumber() {
+    [...tbody.children].forEach((tr, i) => {
+      tr.querySelector('.idx').textContent = i + 1;
+    });
+    countEl.textContent = `${tbody.children.length} 筆`;
+  }
+
+  function validate(inp) {
+    const col = inp.dataset.col;
+    const v = parseFloat(inp.value);
+    const [lo, hi] = RANGES[col];
+    if (inp.value !== '' && (isNaN(v) || v < lo || v > hi)) {
+      inp.classList.add('warn');
+    } else {
+      inp.classList.remove('warn');
+    }
+  }
+
+  function onKey(e) {
+    const inp = e.target;
+    const tr = inp.closest('tr');
+    const inputs = [...tr.querySelectorAll('input')];
+    const i = inputs.indexOf(inp);
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const next = tr.nextElementSibling || addRow(false);
+      next.querySelectorAll('input')[0].focus();
+    } else if (e.key === 'Tab' && !e.shiftKey && i === inputs.length - 1) {
+      if (!tr.nextElementSibling) {
+        e.preventDefault();
+        addRow(true);
+      }
+    } else if (e.key === 'Backspace' && inp.value === '' && i === 0 && tr.previousElementSibling) {
+      e.preventDefault();
+      const prevInputs = tr.previousElementSibling.querySelectorAll('input');
+      prevInputs[prevInputs.length - 1].focus();
+      if (tbody.children.length > 1 && [...tr.querySelectorAll('input')].every(x => x.value === '')) {
+        tr.remove();
+        renumber();
+      }
+    }
+  }
+
+  function getRows() {
+    return [...tbody.children]
+      .map(tr => [...tr.querySelectorAll('input')].map(i => i.value.trim()))
+      .filter(row => row.some(v => v !== ''));
+  }
+
+  function buildCSV() {
+    const rows = getRows();
+    return rows.map(r => r.join(',')).join('\r\n');
+  }
+
+  function download() {
+    const rows = getRows();
+    if (rows.length === 0) {
+      showToast('表格是空的');
+      return;
+    }
+    const blank = rows.find(r => r.some(v => v === ''));
+    if (blank) {
+      const ok = confirm('有空白欄位，仍要下載嗎？\n（AHK 會把空欄當成空字串送出）');
+      if (!ok) return;
+    }
+    const csv = buildCSV();
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'data.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`已下載 ${rows.length} 筆`);
+  }
+
+  document.getElementById('addRow').addEventListener('click', () => addRow(true));
+  document.getElementById('clearAll').addEventListener('click', () => {
+    if (tbody.children.length && !confirm('全部清空？')) return;
+    tbody.innerHTML = '';
+    addRow(true);
+  });
+  document.getElementById('download').addEventListener('click', download);
+
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.copy;
+      const text = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(text).then(
+        () => showToast('已複製到剪貼簿'),
+        () => showToast('複製失敗，請手動選取')
+      );
+    });
+  });
+
+  window.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      download();
+    }
+  });
+
+  addRow(true);
+})();
+</script>
+</body>
+</html>
