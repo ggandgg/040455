@@ -78,6 +78,26 @@ export async function getAssetById(id: string): Promise<Asset | null> {
   }
 }
 
+export async function getAssetsByIds(ids: string[]): Promise<Asset[]> {
+  const results: Asset[] = [];
+  for (const id of ids) {
+    const a = await getAssetById(id);
+    if (a) results.push(a);
+  }
+  return results;
+}
+
+export async function resolveLocalUri(asset: Asset): Promise<string> {
+  try {
+    const info = await MediaLibrary.getAssetInfoAsync(asset.id, {
+      shouldDownloadFromNetwork: false,
+    });
+    return info?.localUri ?? asset.uri;
+  } catch {
+    return asset.uri;
+  }
+}
+
 export async function getAlbums(): Promise<Album[]> {
   const albums = await MediaLibrary.getAlbumsAsync({ includeSmartAlbums: true });
   return albums.filter((a) => !FORBIDDEN_ALBUM_TITLES.has(a.title));
@@ -90,4 +110,9 @@ export async function getFavoritesAlbum(): Promise<Album | null> {
 
 export async function saveToLibrary(localUri: string): Promise<Asset> {
   return MediaLibrary.createAssetAsync(localUri);
+}
+
+export async function deleteAssets(assetIds: string[]): Promise<boolean> {
+  if (assetIds.length === 0) return false;
+  return MediaLibrary.deleteAssetsAsync(assetIds);
 }

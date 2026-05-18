@@ -10,6 +10,9 @@ type Props = {
   assets: Asset[];
   columns: number;
   onPressAsset: (asset: Asset, index: number) => void;
+  onLongPressAsset?: (asset: Asset, index: number) => void;
+  selectedIds?: Set<string>;
+  selectionVisible?: boolean;
   onEndReached?: () => void;
   isLoadingMore?: boolean;
   ListHeaderComponent?: React.ReactElement | null;
@@ -19,6 +22,9 @@ export function AssetGrid({
   assets,
   columns,
   onPressAsset,
+  onLongPressAsset,
+  selectedIds,
+  selectionVisible,
   onEndReached,
   isLoadingMore,
   ListHeaderComponent,
@@ -32,10 +38,17 @@ export function AssetGrid({
   const renderItem = useCallback<ListRenderItem<Asset>>(
     ({ item, index }) => (
       <View style={{ marginRight: (index + 1) % columns === 0 ? 0 : GAP, marginBottom: GAP }}>
-        <AssetThumb asset={item} size={cellSize} onPress={() => onPressAsset(item, index)} />
+        <AssetThumb
+          asset={item}
+          size={cellSize}
+          selected={selectedIds?.has(item.id)}
+          selectionVisible={selectionVisible}
+          onPress={() => onPressAsset(item, index)}
+          onLongPress={onLongPressAsset ? () => onLongPressAsset(item, index) : undefined}
+        />
       </View>
     ),
-    [columns, cellSize, onPressAsset],
+    [columns, cellSize, onPressAsset, onLongPressAsset, selectedIds, selectionVisible],
   );
 
   return (

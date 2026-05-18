@@ -15,6 +15,7 @@ import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
 import { useViewerStore } from '@/store/viewer-store';
 import type { Asset } from '@/features/library/safe-media';
+import { shareAsset } from '@/features/library/actions';
 
 export default function PhotoViewerScreen() {
   const router = useRouter();
@@ -80,7 +81,16 @@ export default function PhotoViewerScreen() {
           <Text style={styles.counter}>
             {currentIndex + 1} / {assets.length}
           </Text>
-          <View style={styles.headerBtn} />
+          <Pressable
+            onPress={() => {
+              const current = assets[currentIndex];
+              if (current) shareAsset(current);
+            }}
+            style={styles.headerBtn}
+            hitSlop={10}
+          >
+            <Text style={styles.headerBtnText}>分享</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     </View>

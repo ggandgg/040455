@@ -1,41 +1,76 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { AssetGrid } from '@/components/AssetGrid';
 import { ColumnPicker } from '@/components/ColumnPicker';
 import { SelectionToolbar } from '@/components/SelectionToolbar';
-import { AddToCollectionSheet } from '@/components/AddToCollectionSheet';
-import { useAssets } from '@/features/library/use-assets';
+import {
+  deleteCollection,
+  getCollection,
+  listCollectionItems,
+  removeAssetFromCollection,
+} from '@/features/collections/repo';
+import { getAssetsByIds, type Asset } from '@/features/library/safe-media';
+import { shareAssets } from '@/features/library/actions';
 import { useLibraryStore } from '@/store/library-store';
 import { useSelectionStore } from '@/store/selection-store';
 import { useViewerStore } from '@/store/viewer-store';
-import { deleteAssetsAction, shareAssets } from '@/features/library/actions';
 
-export default function AlbumScreen() {
-  const { id, title } = useLocalSearchParams<{ id: string; title?: string }>();
+export default function CollectionScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const columns = useLibraryStore((s) => s.columns);
   const setColumns = useLibraryStore((s) => s.setColumns);
   const selection = useSelectionStore();
   const openViewer = useViewerStore((s) => s.open);
-  const [showSheet, setShowSheet] = useState(false);
 
-  const { assets, loadMore, isLoadingMore, reload } = useAssets({ albumId: id });
+  const [title, setTitle] = useState('精選集');
+  const [assets, setAssets] = useState<Asset[]>([]);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    const meta = await getCollection(id);
+    if (meta) setTitle(meta.name);
+    const assetIds = await listCollectionItems(id);
+    const loaded = await getAssetsByIds(assetIds);
+    setAssets(loaded);
+  }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
   const selected = assets.filter((a) => selection.ids.has(a.id));
 
-  const handleDelete = () => {
-    Alert.alert('刪除照片', `將 ${selection.count()} 張照片移到「最近刪除」。`, [
+  const handleRemove = () => {
+    if (!id) return;
+    Alert.alert('從精選集移除', `將 ${selection.count()} 張從精選集移除（不會刪除原檔）。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '移除',
+        style: 'destructive',
+        onPress: async () => {
+          for (const a of selected) {
+            await removeAssetFromCollection(id, a.id);
+          }
+          selection.exit();
+          await load();
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteCollection = () => {
+    if (!id) return;
+    Alert.alert('刪除精選集', `「${title}」會被刪除（原相簿照片不受影響）。`, [
       { text: '取消', style: 'cancel' },
       {
         text: '刪除',
         style: 'destructive',
         onPress: async () => {
-          const ok = await deleteAssetsAction(selected);
-          if (ok) {
-            selection.exit();
-            await reload();
-          }
+          await deleteCollection(id);
+          router.back();
         },
       },
     ]);
@@ -43,7 +78,18 @@ export default function AlbumScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Stack.Screen options={{ title: title ?? '相簿', headerBackTitle: '返回' }} />
+      <Stack.Screen
+        options={{
+          title,
+          headerBackTitle: '返回',
+          headerRight: () => (
+            <Pressable onPress={handleDeleteCollection} hitSlop={10}>
+              <Text style={styles.headerRight}>刪除</Text>
+            </Pressable>
+          ),
+        }}
+      />
+
       <View style={styles.toolbar}>
         {selection.active ? (
           <View style={styles.selRow}>
@@ -59,6 +105,7 @@ export default function AlbumScreen() {
           <ColumnPicker value={columns} onChange={setColumns} />
         )}
       </View>
+
       <AssetGrid
         assets={assets}
         columns={columns}
@@ -75,8 +122,6 @@ export default function AlbumScreen() {
         onLongPressAsset={(a) => {
           if (!selection.active) selection.enter(a.id);
         }}
-        onEndReached={loadMore}
-        isLoadingMore={isLoadingMore}
       />
 
       <SelectionToolbar
@@ -90,30 +135,14 @@ export default function AlbumScreen() {
             onPress: () => shareAssets(selected),
           },
           {
-            key: 'collect',
-            label: '精選集',
-            icon: '✦',
-            disabled: selection.count() === 0,
-            onPress: () => setShowSheet(true),
-          },
-          {
-            key: 'delete',
-            label: '刪除',
-            icon: '🗑',
+            key: 'remove',
+            label: '移除',
+            icon: '⊖',
             destructive: true,
             disabled: selection.count() === 0,
-            onPress: handleDelete,
+            onPress: handleRemove,
           },
         ]}
-      />
-
-      <AddToCollectionSheet
-        visible={showSheet}
-        assetIds={Array.from(selection.ids)}
-        onClose={(added) => {
-          setShowSheet(false);
-          if (added) selection.exit();
-        }}
       />
     </SafeAreaView>
   );
@@ -137,4 +166,5 @@ const styles = StyleSheet.create({
   },
   selAction: { color: '#0a5cff', fontSize: 15 },
   selCount: { fontSize: 15, fontWeight: '600' },
+  headerRight: { color: '#d70015', fontSize: 15 },
 });
