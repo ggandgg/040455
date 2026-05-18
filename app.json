@@ -53,6 +53,12 @@
           "isAccessMediaLocationEnabled": false
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "需要讀取相片以選擇剪片素材。"
+        }
+      ],
       "expo-sqlite",
       "expo-video"
     ],

@@ -6,7 +6,8 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "movie-maker": ["./modules/movie-maker/src/index.ts"]
     }
   },
   "include": [

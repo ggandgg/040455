@@ -29,6 +29,8 @@
     "expo-video": "~55.0.17",
     "expo-file-system": "~55.0.20",
     "expo-haptics": "~55.0.7",
+    "expo-image-picker": "~55.0.20",
+    "movie-maker": "file:./modules/movie-maker",
     "react": "19.2.6",
     "react-native": "0.85.3",
     "react-native-gesture-handler": "~2.20.0",
