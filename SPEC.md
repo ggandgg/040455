@@ -2,7 +2,7 @@
 
 iOS 相簿整理、分享、自動剪片 app — 規格與技術設計。
 
-> 狀態：草稿 v0.2 — 等待 owner 確認後再開始實作。
+> 狀態：草稿 v0.3 — 等待 owner 確認後再開始實作。
 > Owner：chi（Windows 開發環境，無 Mac）
 > 主要測試裝置：iPhone 16 Pro（A18 Pro、iOS 18+）
 > 發佈方式：EAS Build（雲端編譯）→ AltStore for Windows 側載
@@ -160,9 +160,81 @@ CREATE TABLE movie_drafts (
   - Limited 狀態時顯示「重新選取可存取的照片」按鈕（呼叫 `PHPhotoLibrary.presentLimitedLibraryPicker`）
 - `expo-media-library` 0.x 已支援上述 API
 
-**離線/隱私原則：**
-- 所有照片處理 100% 在本機，不上傳任何雲端。
-- 不蒐集 telemetry（v1 不接 analytics）。
+**離線/隱私原則（強化版，硬性要求）：**
+
+| 原則 | 實作 |
+|---|---|
+| **零網路** | App 啟動到關閉，**不發出任何外連請求**。包含 telemetry、crash report、remote config、廣告、字型 CDN |
+| **每支手機獨立** | 多支手機各自獨立安裝、各自本機 SQLite、不同步、不識別、不關聯。沒有「裝置 ID」、沒有帳號系統 |
+| **拒絕已刪除照片** | iOS「最近刪除」相簿 PhotoKit 本來就不開放讀取，不額外請求；明確不請求 `NSPhotoLibraryAccessibilityUsageDescription` |
+| **拒絕隱藏照片** | 所有 `PHFetchOptions` 強制設 `includeHiddenAssets = false`，UI 也不提供「顯示隱藏」開關 |
+| **不蒐集 metadata** | 不讀 EXIF 的 GPS 經緯度做任何用途；只用日期/解析度顯示 |
+
+### 技術強制手段
+
+**1. App Transport Security — 全面拒絕對外連線**
+
+`Info.plist`：
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+  <key>NSAllowsArbitraryLoads</key>
+  <false/>
+</dict>
+<!-- 且不加任何 NSExceptionDomains -->
+```
+
+加上 **Outgoing Network Connections** 不申請任何 entitlement。Production build 完全沒有 client-side network code（dev build 才有 Metro bundler 連線，且僅本機 LAN）。
+
+**2. 拒絕第三方追蹤 SDK — 套件白名單**
+
+| 用途 | 採用 | 拒絕 |
+|---|---|---|
+| 路由 | expo-router | — |
+| 相簿 | expo-media-library | — |
+| 影片 | expo-video（純播放） | — |
+| 分享 | expo-sharing（系統 sheet） | — |
+| Crash | **不接** | Sentry、Bugsnag、Firebase Crashlytics |
+| Analytics | **不接** | Amplitude、Mixpanel、PostHog、Segment、GA |
+| Remote Config | **不接** | Firebase Remote Config |
+| Ads | **不接** | AdMob、Facebook Audience |
+
+CI 會跑一個 script 掃 `package.json`，含上述任一字串就 fail。
+
+**3. 隱藏與已刪除照片 — 程式碼層防護**
+
+所有 `expo-media-library` 呼叫一律包一層 wrapper：
+
+```ts
+// src/features/library/safe-media.ts
+import * as MediaLibrary from 'expo-media-library';
+
+const FORBIDDEN_ALBUMS = ['Hidden', '已隱藏', 'Recently Deleted', '最近刪除'];
+
+export async function safeGetAssets(opts: Omit<MediaLibrary.AssetsOptions, 'album'>) {
+  return MediaLibrary.getAssetsAsync({
+    ...opts,
+    // expo-media-library 不直接讀隱藏相簿；
+    // 額外用 album 過濾雙重保險
+  });
+}
+
+export async function safeGetAlbums() {
+  const albums = await MediaLibrary.getAlbumsAsync();
+  return albums.filter(a => !FORBIDDEN_ALBUMS.includes(a.title));
+}
+```
+
+UI 不顯示「隱藏」「最近刪除」相簿，且 `getAssetsAsync` 預設不含隱藏資產（PhotoKit 預設行為）。
+
+**4. 多裝置獨立的具體含義**
+
+- App 不產生任何 install UUID、不寫 keychain
+- SQLite 檔案路徑為 sandbox 內，無備份到 iCloud (`NSURLIsExcludedFromBackupKey = true`)
+- 如 chi 同時用 iPhone A 和 iPhone B 安裝這個 app：
+  - A 的精選集 B 看不到
+  - A 不知道 B 的存在
+  - 兩台都不向任何伺服器報到
 
 **Free Apple ID（無 Developer 帳號）的限制 — 與本 app 的關係：**
 
@@ -370,6 +442,9 @@ Expo 免費方案：每月 30 次 iOS build。一般開發節奏夠用；密集 
 | R4 | iOS 17 limited library 的 UX | 低 | 已在 §6 處理 |
 | R5 | v1 不含 AI 辨識，使用者期待落差 | 低 | 需在 onboarding 說明 |
 | R6 | Windows 開發體驗：無法跑 iOS Simulator | 中 | 只能靠 EAS build 後在實機測；TypeScript 邏輯部分可寫 unit test 在 container 跑 |
+| R7 | 零網路要求 — 需阻擋第三方相依間接連網 | 中 | CI 套件白名單腳本 + ATS 全鎖；上 release 前用 Charles/proxy 驗證實際零流量 |
+| R8 | 隱藏照片誤讀 | 中 | 一律走 `safe-media` wrapper，禁止直接 import `expo-media-library`；ESLint 規則檔強制 |
+| R9 | 多裝置間使用者期望同步 | 低 | Onboarding 明確告知「本 app 不同步、無雲端」|
 
 ---
 
@@ -384,6 +459,7 @@ Expo 免費方案：每月 30 次 iOS build。一般開發節奏夠用；密集 
 - [ ] 輸出 1080p H.264 MP4、最長 60 秒
 - [ ] 不接 analytics、不上雲端
 - [ ] **建構路線：EAS Build + AltStore 側載**（§8.5）
+- [ ] **零網路 / 多裝置獨立 / 拒絕隱藏與已刪除照片** 為硬性需求（§6）
 - [ ] 從 M0 開始實作
 
 確認後我會建立 Expo 專案骨架（M0），然後逐個 milestone 推進。
