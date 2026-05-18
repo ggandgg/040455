@@ -1,0 +1,46 @@
+{
+  "name": "photo-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "ios": "expo run:ios",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "check:privacy": "node scripts/check-no-network-deps.mjs",
+    "check:all": "npm run typecheck && npm run lint && npm run check:privacy",
+    "prebuild": "expo prebuild --platform ios --clean",
+    "build:dev": "eas build --platform ios --profile development",
+    "build:preview": "eas build --platform ios --profile preview"
+  },
+  "dependencies": {
+    "expo": "~55.0.24",
+    "expo-router": "~55.0.14",
+    "expo-constants": "~55.0.16",
+    "expo-linking": "~55.0.10",
+    "expo-status-bar": "~55.0.5",
+    "expo-system-ui": "~55.0.7",
+    "expo-splash-screen": "~55.0.13",
+    "expo-media-library": "~55.0.17",
+    "expo-image": "~55.0.10",
+    "expo-sharing": "~55.0.10",
+    "expo-sqlite": "~55.0.16",
+    "expo-video": "~55.0.17",
+    "expo-file-system": "~55.0.20",
+    "expo-haptics": "~55.0.7",
+    "react": "19.2.6",
+    "react-native": "0.85.3",
+    "react-native-gesture-handler": "~2.20.0",
+    "react-native-reanimated": "~4.0.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.25.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.1",
+    "typescript": "~5.6.0",
+    "eslint": "^9.15.0",
+    "eslint-config-expo": "~9.0.0"
+  }
+}
