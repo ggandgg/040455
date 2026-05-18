@@ -2,7 +2,7 @@
 
 iOS 相簿整理、分享、自動剪片 app — 規格與技術設計。
 
-> 狀態：草稿 v0.4 — 等待 owner 確認後再開始實作。
+> 狀態：草稿 v0.5 — 等待 owner 確認後再開始實作。
 > Owner：chi（手機優先，Windows 僅一次性輔助、無 Mac）
 > 主要測試裝置：iPhone 16 Pro（A18 Pro、iOS 18+）
 > 發佈方式：EAS Build（雲端編譯）→ SideStore（手機端側載，無需 PC 重簽）
@@ -70,7 +70,10 @@ v1 不做 AI 辨識（人臉/物件/OCR），列入 v2 候選。
   - **柔和 (Mellow)** — 慢切，每張 2–3 秒，含淡入淡出
   - **混合 (Mix)** — 隨機節奏
 - 選擇配樂：內建 3–5 首免版稅音樂 / 從相簿選音樂檔案
-- 輸出規格：1080p H.264 MP4、最長 60 秒
+- 輸出規格：
+  - 比例：**1:1（方）** / **9:16（直，IG Reels 用）** / **16:9（橫）** 三選一
+  - 預設 1080×1920（9:16）以對齊 Instagram Reels / TikTok 標準
+  - H.264 MP4，最長 90 秒（IG Reels 上限）
 - 完成後預覽 → 儲存到相簿 / 分享 / 重新生成
 
 ### v2（候選，不在本次實作）
@@ -78,6 +81,16 @@ v1 不做 AI 辨識（人臉/物件/OCR），列入 v2 候選。
 - 智能搜尋（自然語言：「去年在海邊的照片」）
 - 雲端備份
 - Live Photo / HDR / ProRAW 處理
+- **IG / Reels 風格模板套件**（chi 之後會提供模板樣本給我參考實作）：
+  - 例：節奏卡點切換、滿版字幕、特定轉場、貼圖、漸層遮罩、特定字體與字級規範
+  - v1 模板系統會預留 plugin 介面，v2 加新模板不用重做 native 模組
+
+### 模板系統可擴充性（v1 必須預留）
+
+- 模板定義抽出成 **JSON / TypeScript schema**，描述：每秒節奏、轉場類型、字幕樣式、輸出比例、配樂節拍對齊規則
+- Swift 原生模組 `MovieMaker` 接收 schema → 解析 → 用 AVFoundation 執行
+- v2 新增模板 = 寫一個新 schema（純 TypeScript），**不用改 Swift code**
+- chi 之後丟 IG 短片樣本給我時，我就能用這個 schema 去描述、不用重做底層
 
 ---
 
@@ -277,19 +290,61 @@ modules/movie-maker/
     └── index.ts                   # TypeScript API
 ```
 
-**JS API 設計：**
+**JS API 設計（schema-driven，v2 加 IG 模板不用改 Swift）：**
 
 ```ts
-import { MovieMaker } from '@/modules/movie-maker';
+import { MovieMaker, type MovieTemplate } from '@/modules/movie-maker';
+
+// 模板 = 純 JSON / TS 物件，描述「怎麼剪」
+const beatTemplate: MovieTemplate = {
+  id: 'beat',
+  aspectRatio: '9:16',          // '1:1' | '9:16' | '16:9'
+  resolution: { w: 1080, h: 1920 },
+  rhythm: { mode: 'beat-sync', minClipMs: 400, maxClipMs: 900 },
+  transitions: [{ type: 'cut', weight: 0.7 }, { type: 'fade', durationMs: 150, weight: 0.3 }],
+  effects: [{ type: 'ken-burns', intensity: 0.2 }],
+  captions: null,               // v2 IG 模板會在這裡塞字幕規格
+};
 
 const result = await MovieMaker.compose({
   assets: [{ id: 'PHAsset-id-1', kind: 'photo' }, ...],
-  template: 'beat',
+  template: beatTemplate,        // 模板物件本身，不只是字串 id
   musicUri: 'file://...',
-  outputDuration: 30,  // seconds, 0 = auto
-  onProgress: (p) => console.log(p),  // 0..1
+  outputDurationMs: 30000,       // 0 = 跟著音樂全長
+  onProgress: (p) => {},         // 0..1
 });
-// result: { uri: 'file://.../output.mp4', duration, width, height }
+// result: { uri: 'file://.../output.mp4', durationMs, width, height }
+```
+
+**Template schema（v1 已定義、預留 v2 IG 用欄位）：**
+
+```ts
+type MovieTemplate = {
+  id: string;
+  aspectRatio: '1:1' | '9:16' | '16:9';
+  resolution: { w: number; h: number };
+  rhythm: {
+    mode: 'fixed' | 'beat-sync' | 'random';
+    minClipMs: number;
+    maxClipMs: number;
+  };
+  transitions: Array<{ type: 'cut' | 'fade' | 'wipe' | 'zoom'; durationMs?: number; weight: number }>;
+  effects: Array<{ type: 'ken-burns' | 'parallax' | 'tilt' | 'none'; intensity: number }>;
+  captions: null | {              // v2 IG 模板用，v1 留 null
+    style: 'subtitle' | 'centered' | 'lower-third';
+    font: string;
+    sizePt: number;
+    color: string;
+    strokeColor?: string;
+    appearance: 'fade' | 'pop' | 'typewriter';
+  };
+  stickers?: Array<{              // v2 預留
+    uri: string;
+    anchor: { x: number; y: number };  // 0..1 normalized
+    appearAtMs: number;
+    durationMs: number;
+  }>;
+};
 ```
 
 **Swift 內部用到的 AVFoundation 元件：**
