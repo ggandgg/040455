@@ -2,9 +2,10 @@
 
 iOS 相簿整理、分享、自動剪片 app — 規格與技術設計。
 
-> 狀態：草稿 v0.1 — 等待 owner 確認後再開始實作。
-> Owner：chi
+> 狀態：草稿 v0.2 — 等待 owner 確認後再開始實作。
+> Owner：chi（Windows 開發環境，無 Mac）
 > 主要測試裝置：iPhone 16 Pro（A18 Pro、iOS 18+）
+> 發佈方式：EAS Build（雲端編譯）→ AltStore for Windows 側載
 
 ---
 
@@ -163,6 +164,20 @@ CREATE TABLE movie_drafts (
 - 所有照片處理 100% 在本機，不上傳任何雲端。
 - 不蒐集 telemetry（v1 不接 analytics）。
 
+**Free Apple ID（無 Developer 帳號）的限制 — 與本 app 的關係：**
+
+| Apple 限制 | 影響本 app？ |
+|---|---|
+| 同時只能側載 3 個 app | ⚠️ 要小心 |
+| Provisioning profile 7 天到期，要重簽 | ⚠️ AltStore 自動處理（PC 同網路時） |
+| 無 Push Notification | ✅ 本 app 不需要 |
+| 無 iCloud / CloudKit | ✅ 本 app 100% 本機 |
+| 無 In-App Purchase | ✅ 本 app 不收費 |
+| 無 App Groups / Extensions | ✅ 本 app 不需要 |
+| Photo Library / AVFoundation / Vision | ✅ **完全可用** |
+
+**結論：** v1 規格的所有功能在 free Apple ID 下都能跑。
+
 ---
 
 ## 7. 自動剪片技術選型（重點）
@@ -254,11 +269,83 @@ const result = await MovieMaker.compose({
 
 ---
 
+## 8.5 Build & 部署流程（Windows + AltStore 路線）
+
+### 一次性設定（chi 在 Windows 上做一次）
+
+1. **註冊 Expo 帳號** — https://expo.dev（免費）
+2. **安裝工具**（Windows）
+   - Node.js 20+
+   - `npm install -g eas-cli`
+   - **Apple Devices app**（從 Microsoft Store） — 取代舊 iTunes，AltServer 需要
+   - **iCloud for Windows**（從 Microsoft Store）
+   - **AltServer for Windows** — https://altstore.io
+3. **在 iPhone 16 Pro 上**
+   - 安裝 **AltStore** app（透過 AltServer 第一次安裝）
+   - 用免費 Apple ID 登入 AltStore
+4. **註冊 app bundle ID** — 例如 `com.chi.photoapp`（在 `app.json` 設定）
+
+### 每次要裝新版到手機
+
+```
+[Windows 容器內]                [chi 的 Windows PC]            [iPhone 16 Pro]
+                                                                      
+1. 修改 code                                                         
+2. git push                                                          
+3. 觸發 EAS Build                                                    
+   eas build --platform ios                                          
+   --profile development                                             
+                                                                     
+   (~10 min 雲端編譯)                                                
+                                                                     
+4. 拿到 .ipa 下載連結 ─────────► 5. 下載 .ipa                       
+                                  6. 拖進 AltStore (Windows)        
+                                  7. AltServer 自動推送 ──────────► 8. 安裝完成
+                                                                     
+                                                                     [每 7 天]
+                                  AltServer 同網路時自動重簽 ──────► 自動續期
+```
+
+### EAS Build 設定（`eas.json`）
+
+```json
+{
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "credentialsSource": "remote"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": { "credentialsSource": "remote" }
+    }
+  }
+}
+```
+
+`distribution: internal` 會產生可側載的 IPA（不走 App Store）。
+
+### EAS Build 免費額度
+
+Expo 免費方案：每月 30 次 iOS build。一般開發節奏夠用；密集 debug 時可能要等隊伍或升級 ($19/月)。
+
+### Bundle ID 與簽章注意事項
+
+- Bundle ID 用免費 Apple ID 簽章時，**同一個 Apple ID 最多 10 個不同 Bundle ID / 7 天**
+- AltStore 預設用萬用 wildcard ID，會自動處理
+- 若日後升級成 Developer 帳號（$99/年），同樣的 Bundle ID 可無痛轉移上 TestFlight
+
+---
+
 ## 9. 開發里程碑
 
 | Milestone | 內容 | 估時 |
 |---|---|---|
-| M0 | Expo 專案骨架 + Dev Client + Tab navigation | 0.5 天 |
+| M0 | Expo 專案骨架 + Dev Client + Tab navigation + EAS Build 設定 | 1 天 |
 | M1 | F1 相簿瀏覽（網格 + 全螢幕 + limited library 處理） | 1.5 天 |
 | M2 | F2 整理（多選、收藏、刪除、精選集 CRUD） | 2 天 |
 | M3 | F3 分享 | 0.5 天 |
@@ -274,11 +361,15 @@ const result = await MovieMaker.compose({
 
 | # | 議題 | 影響 | 備註 |
 |---|---|---|---|
-| R1 | **這個容器無法跑 Xcode build / iOS Simulator** | 高 | Owner（chi）需自備 Mac + Xcode 跑 dev client，container 內只能寫 code + 跑 lint/test。實機部署到 iPhone 16 Pro 也需要 Mac + Xcode |
-| R2 | Apple Developer 帳號（$99/yr） | 中 | 上 TestFlight 才需要，裝實機可用免費 Apple ID（7 天簽章） |
+| R1 | chi 用 Windows，無 Mac | 高 | 已決定走 **EAS Build 雲端編譯 + AltStore 側載** 路線（見 §8.5） |
+| R1a | EAS Build 每次 ~10 分鐘等待 | 中 | 開發節奏會慢；盡量在 container 內先把 TypeScript / lint / test 通過再 push |
+| R1b | AltStore 7 天自動重簽 | 中 | chi 需要讓 PC 開著 AltServer 且與 iPhone 在同一 WiFi；偶爾沒重簽到要手動 |
+| R2 | EAS Build 免費額度 30/月 | 低 | 一般夠用；若超量可升級或暫停測試 |
+| R3 | 同時只能側載 3 個 app（免費 Apple ID） | 低 | 本 app 只佔 1 個 slot |
 | R3 | 內建配樂版權來源 | 中 | 候選：YouTube Audio Library / Pixabay / 自製 |
 | R4 | iOS 17 limited library 的 UX | 低 | 已在 §6 處理 |
 | R5 | v1 不含 AI 辨識，使用者期待落差 | 低 | 需在 onboarding 說明 |
+| R6 | Windows 開發體驗：無法跑 iOS Simulator | 中 | 只能靠 EAS build 後在實機測；TypeScript 邏輯部分可寫 unit test 在 container 跑 |
 
 ---
 
@@ -292,6 +383,19 @@ const result = await MovieMaker.compose({
 - [ ] 內建 3–5 首免版稅配樂
 - [ ] 輸出 1080p H.264 MP4、最長 60 秒
 - [ ] 不接 analytics、不上雲端
+- [ ] **建構路線：EAS Build + AltStore 側載**（§8.5）
 - [ ] 從 M0 開始實作
 
 確認後我會建立 Expo 專案骨架（M0），然後逐個 milestone 推進。
+
+### chi 要自己準備的事（不在這個容器裡能做）
+
+| # | 事項 | 何時 |
+|---|---|---|
+| 1 | 註冊 Expo 帳號 https://expo.dev | M0 前 |
+| 2 | Windows PC 安裝 Apple Devices app + iCloud + AltServer | M0 後、第一次裝 app 前 |
+| 3 | iPhone 16 Pro 透過 AltServer 安裝 AltStore | 同上 |
+| 4 | 在 AltStore 用免費 Apple ID 登入 | 同上 |
+
+我會在 M0 完成時給 chi 詳細圖文指引。
+
