@@ -2,10 +2,10 @@
 
 iOS 相簿整理、分享、自動剪片 app — 規格與技術設計。
 
-> 狀態：草稿 v0.3 — 等待 owner 確認後再開始實作。
-> Owner：chi（Windows 開發環境，無 Mac）
+> 狀態：草稿 v0.4 — 等待 owner 確認後再開始實作。
+> Owner：chi（手機優先，Windows 僅一次性輔助、無 Mac）
 > 主要測試裝置：iPhone 16 Pro（A18 Pro、iOS 18+）
-> 發佈方式：EAS Build（雲端編譯）→ AltStore for Windows 側載
+> 發佈方式：EAS Build（雲端編譯）→ SideStore（手機端側載，無需 PC 重簽）
 
 ---
 
@@ -341,42 +341,65 @@ const result = await MovieMaker.compose({
 
 ---
 
-## 8.5 Build & 部署流程（Windows + AltStore 路線）
+## 8.5 Build & 部署流程（SideStore 路線，手機獨立）
 
-### 一次性設定（chi 在 Windows 上做一次）
+### 整體思路
 
-1. **註冊 Expo 帳號** — https://expo.dev（免費）
-2. **安裝工具**（Windows）
-   - Node.js 20+
-   - `npm install -g eas-cli`
-   - **Apple Devices app**（從 Microsoft Store） — 取代舊 iTunes，AltServer 需要
-   - **iCloud for Windows**（從 Microsoft Store）
-   - **AltServer for Windows** — https://altstore.io
-3. **在 iPhone 16 Pro 上**
-   - 安裝 **AltStore** app（透過 AltServer 第一次安裝）
-   - 用免費 Apple ID 登入 AltStore
-4. **註冊 app bundle ID** — 例如 `com.chi.photoapp`（在 `app.json` 設定）
+SideStore 是 AltStore 的「無 PC」分支：手機端跑一個本機 WireGuard 通道幫自己重簽。設定完成後，**Windows 完全可有可無**。
 
-### 每次要裝新版到手機
+### 一次性設定（Windows 只在這一步出現，之後就退場）
+
+#### 步驟 1：建立 Expo 帳號與 Bundle ID
+- 註冊 https://expo.dev（免費）
+- `app.json` 設定 bundle id，例如 `com.chi.photoapp`
+
+#### 步驟 2：iPhone 安裝 SideStore（不需要 PC）
+- 用 Safari 開 https://sidestore.io
+- 依官方步驟透過免費 Apple ID 安裝 SideStore（一次性，過程在手機上完成）
+- 在 SideStore 內用免費 Apple ID 登入
+
+#### 步驟 3：產生 pairing file（**這一步要 Windows 一次**）
+
+SideStore 需要一個「pairing file」才能在手機上自重簽。產生方式：
+
+| 方法 | 是否需 PC | 說明 |
+|---|---|---|
+| **JitterbugPair for Windows** | ✅ 一次 | chi 用 USB 把 iPhone 接到 Windows PC，跑 JitterbugPair 工具產出 `.mobiledevicepairing` 檔，AirDrop 或 iCloud 傳到手機，匯入 SideStore |
+| **付費線上服務** | ❌ | 例如 SideStore 文件列出的第三方 web service，付小額美金代產生 |
+
+- chi 選 JitterbugPair（免費）這條路：**就這一次需要 Windows + USB 線**
+- 之後 PC 可以擺一邊不管它
+
+#### 步驟 4：開啟 SideStore 背景刷新
+- iPhone 設定 → SideStore → 開啟「背景 App 重新整理」
+- 設定 → 通用 → 背景 App 重新整理 → SideStore = 開
+- 之後 SideStore 會在背景每幾天自動重簽，**完全在手機本機完成**，不發送任何照片資料到外部
+
+### 平常開發 / 更新流程（手機獨立）
 
 ```
-[Windows 容器內]                [chi 的 Windows PC]            [iPhone 16 Pro]
-                                                                      
-1. 修改 code                                                         
-2. git push                                                          
-3. 觸發 EAS Build                                                    
-   eas build --platform ios                                          
-   --profile development                                             
-                                                                     
-   (~10 min 雲端編譯)                                                
-                                                                     
-4. 拿到 .ipa 下載連結 ─────────► 5. 下載 .ipa                       
-                                  6. 拖進 AltStore (Windows)        
-                                  7. AltServer 自動推送 ──────────► 8. 安裝完成
-                                                                     
-                                                                     [每 7 天]
-                                  AltServer 同網路時自動重簽 ──────► 自動續期
+[Claude 在容器內]                                    [chi 的 iPhone 16 Pro]
+                                                              
+1. 修改 code                                                  
+2. git push                                                   
+3. 觸發 EAS Build (從容器跑 eas-cli)                          
+                                                              
+   (~10 min 雲端編譯)                                         
+                                                              
+4. EAS Build 完成，產出 .ipa 與下載 URL                      
+                                                              
+5. Claude 把 IPA URL 用 sidestore:// scheme 包好             
+   告訴 chi                                          ────────►  6. chi 在手機 Safari 點連結
+                                                                  SideStore 自動接手下載 + 安裝
+                                                                  
+                                                                  (整個流程手機上完成)
+                                                                  
+                                                              [每 ~5 天]
+                                                              SideStore 背景自動重簽
+                                                              無需任何外部裝置介入
 ```
+
+**關鍵點：** SideStore 支援 `sidestore://install?url=<ipa_url>` 這種深層連結。在手機 Safari 點下去就會跳到 SideStore 開始安裝。整個過程完全在手機內。
 
 ### EAS Build 設定（`eas.json`）
 
@@ -401,15 +424,30 @@ const result = await MovieMaker.compose({
 
 `distribution: internal` 會產生可側載的 IPA（不走 App Store）。
 
+### Bundle ID 與簽章
+
+- 免費 Apple ID 限制：同帳號最多 3 個側載 app、每組憑證 7 天到期
+- SideStore 在手機上跑 WireGuard 通道 → 用 Apple ID 的 developer cert 重簽 → 完全本機完成
+- 重簽過程**不傳照片資料、不傳 app 內容**，只跟 Apple developer API 取憑證
+
 ### EAS Build 免費額度
 
 Expo 免費方案：每月 30 次 iOS build。一般開發節奏夠用；密集 debug 時可能要等隊伍或升級 ($19/月)。
 
-### Bundle ID 與簽章注意事項
+### SideStore 路線的風險（誠實揭露）
 
-- Bundle ID 用免費 Apple ID 簽章時，**同一個 Apple ID 最多 10 個不同 Bundle ID / 7 天**
-- AltStore 預設用萬用 wildcard ID，會自動處理
-- 若日後升級成 Developer 帳號（$99/年），同樣的 Bundle ID 可無痛轉移上 TestFlight
+| 風險 | 緩解 |
+|---|---|
+| SideStore 是社群維護，未來可能因 iOS 更新失效 | 屆時可改 AltStore（PC 介入）或升級 Apple Developer 走 TestFlight |
+| 第一次設定要 Windows + USB 線（JitterbugPair 步驟） | 一次性，之後不用 |
+| 免費 Apple ID 限 3 個側載 app 同時存在 | 本 app 只佔 1 slot |
+| 7 天重簽萬一沒有網路 → app 暫時打不開 | 重新進有網路環境即可（重簽過程**不傳照片資料**，只跟 Apple 簽章伺服器拿憑證；符合 §6 隱私要求） |
+| 重簽期間需短暫連網（Apple developer cert API） | 這個連線**僅 SideStore 自己用**，本 app 仍維持零網路 |
+
+### 一句話總結
+
+> Windows + USB 用一次（產 pairing file），之後 chi 的 iPhone 16 Pro 自給自足。
+> 想換新版時手機點一下 SideStore 連結即可。每 5–7 天系統自己背景重簽。
 
 ---
 
@@ -433,9 +471,10 @@ Expo 免費方案：每月 30 次 iOS build。一般開發節奏夠用；密集 
 
 | # | 議題 | 影響 | 備註 |
 |---|---|---|---|
-| R1 | chi 用 Windows，無 Mac | 高 | 已決定走 **EAS Build 雲端編譯 + AltStore 側載** 路線（見 §8.5） |
+| R1 | chi 無 Mac、且希望手機獨立操作 | 高 | 走 **EAS Build + SideStore** 路線：Windows 只在第一次產 pairing file 時用一次，之後手機自重簽（見 §8.5） |
 | R1a | EAS Build 每次 ~10 分鐘等待 | 中 | 開發節奏會慢；盡量在 container 內先把 TypeScript / lint / test 通過再 push |
-| R1b | AltStore 7 天自動重簽 | 中 | chi 需要讓 PC 開著 AltServer 且與 iPhone 在同一 WiFi；偶爾沒重簽到要手動 |
+| R1b | SideStore 7 天自動重簽需偶爾連網 | 中 | 重簽僅與 Apple 簽章伺服器通訊，**不傳 app 內容、不傳照片** |
+| R1c | SideStore 是第三方專案，未來可能因 iOS 更新失效 | 中 | 若發生：退路 1 = 改 AltStore，退路 2 = 升級 Apple Developer + TestFlight |
 | R2 | EAS Build 免費額度 30/月 | 低 | 一般夠用；若超量可升級或暫停測試 |
 | R3 | 同時只能側載 3 個 app（免費 Apple ID） | 低 | 本 app 只佔 1 個 slot |
 | R3 | 內建配樂版權來源 | 中 | 候選：YouTube Audio Library / Pixabay / 自製 |
@@ -466,12 +505,16 @@ Expo 免費方案：每月 30 次 iOS build。一般開發節奏夠用；密集 
 
 ### chi 要自己準備的事（不在這個容器裡能做）
 
-| # | 事項 | 何時 |
-|---|---|---|
-| 1 | 註冊 Expo 帳號 https://expo.dev | M0 前 |
-| 2 | Windows PC 安裝 Apple Devices app + iCloud + AltServer | M0 後、第一次裝 app 前 |
-| 3 | iPhone 16 Pro 透過 AltServer 安裝 AltStore | 同上 |
-| 4 | 在 AltStore 用免費 Apple ID 登入 | 同上 |
+| # | 事項 | 在哪做 | 何時 |
+|---|---|---|---|
+| 1 | 註冊 Expo 帳號 https://expo.dev | 手機或 PC 瀏覽器都行 | M0 前 |
+| 2 | iPhone 安裝 SideStore（依 sidestore.io 步驟） | 📱 手機 | M0 完成、第一次裝 app 前 |
+| 3 | SideStore 內登入免費 Apple ID | 📱 手機 | 同上 |
+| 4 | 產生 pairing file（**僅這一步要 Windows + USB**） | 💻 Windows 一次 | 同上 |
+| 5 | 把 pairing file 匯入 SideStore | 📱 手機 | 同上 |
+| 6 | 開啟 SideStore 背景刷新權限 | 📱 手機 | 同上 |
 
-我會在 M0 完成時給 chi 詳細圖文指引。
+✅ 上述完成後，**Windows 就可以收起來**了。之後 chi 只要在手機 Safari 點安裝連結就能更新 app。
+
+我會在 M0 完成時給 chi 中文圖文指引。
 
