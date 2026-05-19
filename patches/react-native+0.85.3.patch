@@ -183,3 +183,16 @@ index 4ba5b68..1ea2d24 100644
 +  (null: $FlowFixMe) as HostComponent<VirtualViewNativeProps>;
 +
 +export default VirtualViewNativeComponent;
+diff --git a/node_modules/react-native/src/private/specs_DEPRECATED/components/RCTModalHostViewNativeComponent.js b/node_modules/react-native/src/private/specs_DEPRECATED/components/RCTModalHostViewNativeComponent.js
+index a27f5b3..f9a798c 100644
+--- a/node_modules/react-native/src/private/specs_DEPRECATED/components/RCTModalHostViewNativeComponent.js
++++ b/node_modules/react-native/src/private/specs_DEPRECATED/components/RCTModalHostViewNativeComponent.js
+@@ -124,7 +124,7 @@ type RCTModalHostViewNativeProps = Readonly<{
+    * See https://reactnative.dev/docs/modal#supportedorientations
+    */
+   supportedOrientations?: WithDefault<
+-    ReadonlyArray<
++    $ReadOnlyArray<
+       | 'portrait'
+       | 'portrait-upside-down'
+       | 'landscape'
