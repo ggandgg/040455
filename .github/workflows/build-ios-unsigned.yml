@@ -58,6 +58,9 @@ jobs:
           echo "Detected workspace=$WS scheme=$SC"
           xcodebuild -workspace "$WS" -list 2>/dev/null | head -40
 
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
       - name: Build unsigned .app (Release, iphoneos)
         working-directory: ios
         run: |
@@ -75,7 +78,7 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="" \
             PROVISIONING_PROFILE="" \
             ENABLE_BITCODE=NO \
-            clean build
+            clean build 2>&1 | xcbeautify --renderer github-actions
 
       - name: Package IPA (zip Payload/*.app)
         working-directory: ios
