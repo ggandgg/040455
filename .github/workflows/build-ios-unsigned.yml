@@ -50,10 +50,13 @@ jobs:
         run: |
           WS=$(find . -maxdepth 2 -name "*.xcworkspace" -type d | head -1)
           if [ -z "$WS" ]; then echo "No .xcworkspace found"; exit 1; fi
-          SC=$(xcodebuild -workspace "$WS" -list -json | python3 -c "import sys, json; print(json.load(sys.stdin)['workspace']['schemes'][0])")
+          # The app scheme matches the workspace basename (e.g. Photo.xcworkspace -> Photo).
+          # Do NOT pick schemes[0] — that's usually a Pods scheme like EXConstants.
+          SC=$(basename "$WS" .xcworkspace)
           echo "workspace=$WS" >> "$GITHUB_OUTPUT"
           echo "scheme=$SC" >> "$GITHUB_OUTPUT"
           echo "Detected workspace=$WS scheme=$SC"
+          xcodebuild -workspace "$WS" -list 2>/dev/null | head -40
 
       - name: Build unsigned .app (Release, iphoneos)
         working-directory: ios
