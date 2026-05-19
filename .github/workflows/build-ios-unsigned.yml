@@ -9,6 +9,7 @@ on:
       - 'app/**'
       - 'src/**'
       - 'modules/**'
+      - 'patches/**'
       - 'package.json'
       - 'package-lock.json'
       - 'app.json'
