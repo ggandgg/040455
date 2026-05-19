@@ -19,6 +19,8 @@ jobs:
   build:
     runs-on: macos-latest
     timeout-minutes: 90
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -113,3 +115,21 @@ jobs:
           path: ios/Photo-unsigned.ipa
           retention-days: 14
           if-no-files-found: error
+
+      - name: Publish GitHub Release with IPA
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Photo build ${{ github.run_number }}"
+          body: |
+            Auto-generated unsigned IPA for SideStore install.
+
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+
+            Install on iPhone Safari via:
+            `sidestore://install?url=<this asset URL>`
+          files: ios/Photo-unsigned.ipa
+          prerelease: true
+          make_latest: true
+          fail_on_unmatched_files: true
