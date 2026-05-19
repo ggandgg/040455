@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as DocumentPicker from 'expo-document-picker';
 import { useComposerStore } from '@/store/composer-store';
 import { BUILTIN_TEMPLATES } from '@/features/movie/templates';
 import { BUILTIN_TRACKS, trackUri } from '@/features/movie/use-music';
@@ -26,25 +25,12 @@ export default function ComposerScreen() {
   const musicId = useComposerStore((s) => s.musicId);
   const setMusicId = useComposerStore((s) => s.setMusicId);
   const customMusic = useComposerStore((s) => s.customMusic);
-  const setCustomMusic = useComposerStore((s) => s.setCustomMusic);
   const durationSec = useComposerStore((s) => s.durationSec);
   const setDurationSec = useComposerStore((s) => s.setDurationSec);
   const setResult = useComposerStore((s) => s.setResult);
 
   const [composing, setComposing] = useState(false);
   const [progress, setProgress] = useState(0);
-
-  const pickAudio = async () => {
-    const res = await DocumentPicker.getDocumentAsync({
-      type: 'audio/*',
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
-    if (res.canceled || res.assets.length === 0) return;
-    const a = res.assets[0]!;
-    setCustomMusic({ uri: a.uri, name: a.name });
-    setMusicId('custom');
-  };
 
   const start = async () => {
     if (assets.length === 0) {
@@ -137,20 +123,8 @@ export default function ComposerScreen() {
             </Pressable>
           ))}
 
-          <Pressable
-            style={[styles.option, musicId === 'custom' && styles.optionActive]}
-            onPress={pickAudio}
-          >
-            <Text style={styles.optionTitle}>
-              {customMusic ? `自選：${customMusic.name}` : '從檔案選擇音訊…'}
-            </Text>
-            <Text style={styles.optionDesc}>
-              {customMusic ? '輕點以更換' : 'MP3 / M4A / WAV / AAC'}
-            </Text>
-          </Pressable>
-
           <Text style={styles.note}>
-            內建配樂音檔將於後續版本提供。選擇「無配樂」或內建占位曲將輸出無聲影片。
+            內建配樂音檔將於後續版本提供。自選音檔功能將在下一版加入。目前選擇將輸出無聲影片。
           </Text>
         </Section>
 
