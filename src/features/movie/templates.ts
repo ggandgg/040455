@@ -44,4 +44,25 @@ export const MIX: MovieTemplate = {
   captions: null,
 };
 
-export const BUILTIN_TEMPLATES: MovieTemplate[] = [BEAT, MELLOW, MIX];
+// Tokyo travel-vlog inspired cinematic template — fast zoom-blur cuts +
+// punched-up color, designed to be a quick first draft that owner then
+// refines in CapCut. No captions; v2 may add per-clip text.
+export const CINEMATIC: MovieTemplate = {
+  id: 'cinematic',
+  name: '電影感 Cinematic',
+  ...reels,
+  rhythm: { mode: 'beat-sync', minClipMs: 300, maxClipMs: 700 },
+  transitions: [
+    { type: 'zoom', durationMs: 220, weight: 0.55 },
+    { type: 'cut', weight: 0.3 },
+    { type: 'fade', durationMs: 120, weight: 0.15 },
+  ],
+  effects: [
+    { type: 'ken-burns', intensity: 0.45 },
+    { type: 'motion-blur', intensity: 0.55 },
+    { type: 'color-grade', intensity: 0.6 },
+  ],
+  captions: null,
+};
+
+export const BUILTIN_TEMPLATES: MovieTemplate[] = [BEAT, MELLOW, MIX, CINEMATIC];

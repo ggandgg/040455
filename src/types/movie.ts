@@ -9,7 +9,13 @@ export type RhythmMode = 'fixed' | 'beat-sync' | 'random';
 
 export type TransitionType = 'cut' | 'fade' | 'wipe' | 'zoom';
 
-export type EffectType = 'ken-burns' | 'parallax' | 'tilt' | 'none';
+export type EffectType =
+  | 'ken-burns'
+  | 'parallax'
+  | 'tilt'
+  | 'motion-blur'
+  | 'color-grade'
+  | 'none';
 
 export type CaptionStyle = 'subtitle' | 'centered' | 'lower-third';
 

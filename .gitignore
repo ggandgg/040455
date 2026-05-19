@@ -8,7 +8,7 @@ yarn-debug.*
 yarn-error.*
 .env*.local
 .DS_Store
-ios/
-android/
+/ios/
+/android/
 *.tsbuildinfo
 .eas-build-local-nodejs/
