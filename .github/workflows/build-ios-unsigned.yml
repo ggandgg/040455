@@ -1,0 +1,135 @@
+name: Build iOS (Unsigned for SideStore)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'claude/**'
+    paths:
+      - 'app/**'
+      - 'src/**'
+      - 'modules/**'
+      - 'patches/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'app.json'
+      - '.github/workflows/build-ios-unsigned.yml'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Select latest installed Xcode
+        run: |
+          echo "Installed Xcode versions:"
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$LATEST_XCODE" ]; then
+            echo "No Xcode found, using default"
+          else
+            echo "Selecting $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Expo prebuild (generate ios/ folder)
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Pod install
+        working-directory: ios
+        run: pod install --repo-update
+
+      - name: Discover workspace and scheme
+        id: xc
+        working-directory: ios
+        run: |
+          WS=$(find . -maxdepth 2 -name "*.xcworkspace" -type d | head -1)
+          if [ -z "$WS" ]; then echo "No .xcworkspace found"; exit 1; fi
+          # The app scheme matches the workspace basename (e.g. Photo.xcworkspace -> Photo).
+          # Do NOT pick schemes[0] — that's usually a Pods scheme like EXConstants.
+          SC=$(basename "$WS" .xcworkspace)
+          echo "workspace=$WS" >> "$GITHUB_OUTPUT"
+          echo "scheme=$SC" >> "$GITHUB_OUTPUT"
+          echo "Detected workspace=$WS scheme=$SC"
+          xcodebuild -workspace "$WS" -list 2>/dev/null | head -40
+
+      - name: Install xcbeautify
+        run: brew install xcbeautify
+
+      - name: Build unsigned .app (Release, iphoneos)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace "${{ steps.xc.outputs.workspace }}" \
+            -scheme "${{ steps.xc.outputs.scheme }}" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            PROVISIONING_PROFILE="" \
+            ENABLE_BITCODE=NO \
+            clean build 2>&1 | xcbeautify --renderer github-actions
+
+      - name: Package IPA (zip Payload/*.app)
+        working-directory: ios
+        run: |
+          APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "ERROR: no .app produced under build/Build/Products/Release-iphoneos"
+            find build/Build/Products -maxdepth 3 || true
+            exit 1
+          fi
+          echo "App bundle: $APP"
+          rm -rf Payload Photo-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qr Photo-unsigned.ipa Payload
+          ls -lh Photo-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Photo-unsigned-ipa
+          path: ios/Photo-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Publish GitHub Release with IPA
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: "Photo build ${{ github.run_number }}"
+          body: |
+            Auto-generated unsigned IPA for SideStore install.
+
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+
+            Install on iPhone Safari via:
+            `sidestore://install?url=<this asset URL>`
+          files: ios/Photo-unsigned.ipa
+          prerelease: true
+          make_latest: true
+          fail_on_unmatched_files: true

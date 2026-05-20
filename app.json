@@ -1,0 +1,73 @@
+{
+  "expo": {
+    "name": "Photo",
+    "slug": "photo-app",
+    "scheme": "photoapp",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "jsEngine": "jsc",
+    "ios": {
+      "bundleIdentifier": "com.chi.photoapp",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "deploymentTarget": "17.0",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "需要讀取相片以提供瀏覽、整理與剪片功能。所有處理在本機完成，不會傳出裝置。",
+        "NSPhotoLibraryAddUsageDescription": "需要寫入相簿以儲存剪好的影片。",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": true
+        }
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": ["E174.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ],
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyTracking": false
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "需要讀取相片以瀏覽、整理與剪片。",
+          "savePhotosPermission": "需要寫入相簿以儲存剪好的影片。",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "需要讀取相片以選擇剪片素材。"
+        }
+      ],
+      "expo-sqlite",
+      "expo-video"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {}
+    }
+  }
+}
